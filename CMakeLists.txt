@@ -12,7 +12,7 @@ if (WIN32)
 	include(FindZip)
 	message(STATUS ${ZIP_EXECUTABLE})
 
-	add_definitions(-DAVPN_USE_WINAPI)
+	add_definitions(-DAVPN_USE_WINAPI -DAVPN_WINDOWS)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 	add_definitions(-DAVPN_LINUX)
 elseif (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
@@ -121,8 +121,9 @@ else ()
 endif(TEST_BIG_ENDIAN)
 
 
-set(Boost_USE_STATIC_LIBS	ON)
+set(Boost_USE_STATIC_LIBS		ON)
 set(Boost_USE_STATIC_RUNTIME	ON)
+add_definitions(-DBOOST_ALL_NO_LIB)
 
 find_package(Threads)
 
@@ -138,36 +139,40 @@ if (ENABLE_JEMALLOC_STATIC)
 endif()
 
 set(BOOST_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/boost)
-set(LWIP_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lwip/src/include)
-
-#	set(ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib)
-#	set(OPENSSL_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl/include)
 
 add_definitions(-DBOOST_COROUTINES_NO_DEPRECATION_WARNING)
 add_subdirectory(third_party/boost)
-add_subdirectory(third_party/lwip)
+include_directories(${BOOST_INCLUDE_DIRS})
 
-#	add_subdirectory(third_party/zlib EXCLUDE_FROM_ALL)
-#	add_subdirectory(third_party/openssl)
+add_subdirectory(third_party/zlib EXCLUDE_FROM_ALL)
+set(ZLIB_LIBRARIES zlib)
+set(ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib)
+link_libraries(${ZLIB_LIBRARIES})
+
+add_subdirectory(third_party/fmt)
+set(LIBFMT_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fmt)
+include_directories(${LIBFMT_INCLUDE_DIRS})
+set(LIBFMT_LIBRARIES fmt)
+link_libraries(${LIBFMT_LIBRARIES})
+
+add_subdirectory(vpncore)
 
 include_directories(
-	${BOOST_INCLUDE_DIRS}
-	${LWIP_INCLUDE_DIRS}
-#	${ZLIB_INCLUDE_DIRS}
-#	${OPENSSL_INCLUDE_DIRS}
+	${VPNCORE_INCLUDE_DIRS}
 )
 
 if (WIN32)
 	link_libraries(Secur32.lib)
-else()
-	link_libraries(systemd)
+elseif(UNIX AND NOT APPLE)
+	link_libraries(mnl netlink)
+	if (ENABLE_USE_SYSTEMD_LOGGING)
+		link_libraries(systemd)
+	endif()
 endif()
 
 link_libraries(
-	${LWIP_LIBRARIES}
-#	${ZLIB_LIBRARIES}
-#	${OPENSSL_LIBRARIES}
-	Boost::system Boost::thread Boost::program_options Boost::locale Boost::random Boost::coroutine
+	${VPNCORE_LIBRARIES}
+	Boost::system Boost::thread Boost::chrono Boost::program_options Boost::locale Boost::random Boost::coroutine
 )
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -179,5 +184,5 @@ if (WIN32)
 	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/release)
 endif()
 
-add_subdirectory(vpncore)
+add_subdirectory(avpn)
 
